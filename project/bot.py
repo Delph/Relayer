@@ -100,7 +100,7 @@ async def choose_character(message):
 
     characters.append(Character(character_id, name, class_name, level, money))
 
-  character_index = int(os.environ.get('RELAY_CHARACTER'))
+  character_index = int(os.environ.get('RELAY_CHARACTER', 0))
   await ss.character_select(characters[character_index].character_id)
 
 
@@ -133,34 +133,39 @@ async def text_message(message):
       for channel in alert['channels']:
         await client.get_channel(id=channel).send(message)
 
-  if tm.message == '!squad':
-    if tm.username in [m['name'] for m in ss.team.members]:
-      if not have_squad:
-        await ss.send_message(TextMessage(USER_TALK_TEAM, '/squadcreate'))
-        await ss.send_message(TextMessage(USER_TALK_TEAM, 'Creating squad'))
-        have_squad = True
-    await ss.send_message(TextMessage(USER_TALK_TEAM, f'/squadinvite {tm.username}'))
-  elif tm.message == '!inviteall':
-    if tm.username in [m['name'] for m in ss.team.members]:
-      if not have_squad:
-        await ss.send_message(TextMessage(USER_TALK_TEAM, '/squadcreate'))
-        await ss.send_message(TextMessage(USER_TALK_TEAM, 'Creating squad'))
-        have_squad = True
-      for member in [m for m in ss.team.members if m['lastOn'] == -1]:
-        member_name = member['name']
-        await ss.send_message(TextMessage(USER_TALK_TEAM, f'/squadinvite {member_name}'))
-      await ss.send_message(TextMessage(USER_TALK_TEAM, 'Invited everyone'))
-  elif tm.message == '!leave':
-    if tm.username in [m['name'] for m in ss.team.members]:
-      await ss.send_message(TextMessage(USER_TALK_TEAM, '/squadleave'))
-      await ss.send_message(TextMessage(USER_TALK_TEAM, 'Left the squad'))
-      have_squad = False
+  if ss.team:
+    if tm.message == '!squad':
+      if tm.username in [m['name'] for m in ss.team.members]:
+        if not have_squad:
+          await ss.send_message(TextMessage(USER_TALK_TEAM, '/squadcreate'))
+          await ss.send_message(TextMessage(USER_TALK_TEAM, 'Creating squad'))
+          have_squad = True
+      await ss.send_message(TextMessage(USER_TALK_TEAM, f'/squadinvite {tm.username}'))
+    elif tm.message == '!inviteall':
+      if tm.username in [m['name'] for m in ss.team.members]:
+        if not have_squad:
+          await ss.send_message(TextMessage(USER_TALK_TEAM, '/squadcreate'))
+          await ss.send_message(TextMessage(USER_TALK_TEAM, 'Creating squad'))
+          have_squad = True
+        for member in [m for m in ss.team.members if m['lastOn'] == -1]:
+          member_name = member['name']
+          await ss.send_message(TextMessage(USER_TALK_TEAM, f'/squadinvite {member_name}'))
+        await ss.send_message(TextMessage(USER_TALK_TEAM, 'Invited everyone'))
+    elif tm.message == '!leave':
+      if tm.username in [m['name'] for m in ss.team.members]:
+        await ss.send_message(TextMessage(USER_TALK_TEAM, '/squadleave'))
+        await ss.send_message(TextMessage(USER_TALK_TEAM, 'Left the squad'))
+        have_squad = False
 
   message = ''
   if tm.username is not None:
     message = f'**[{tm.username}]** {tm.message}'
   else:
     message = f'{tm.message}'
+
+  # don't send empty messages
+  if message == '':
+    return
 
   channels = recv_mapping(tm.type)
   for channel in channels:
@@ -203,8 +208,6 @@ async def on_ready():
   print('------')
 
   print('Registering tasks')
-  if os.environ.get('BULLETIN_BOARD_CH'):
-    client.loop.create_task(bboard())
 
   username = os.environ.get('RELAY_USERNAME')
   password = os.environ.get('RELAY_PASSWORD')
@@ -241,6 +244,8 @@ async def on_message(message):
       tm.message = tm.message.replace(f'<@&{mention.id}>', f'@{mention.name}')
     for mention in message.channel_mentions:
       tm.message = tm.message.replace(f'<#{mention.id}>', f'#{mention.name}')
+    if tm.message == '':
+      return
     await ss.send_message(tm)
 
 
