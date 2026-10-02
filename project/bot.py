@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ElementTree
 import math
 import sys
 import json
+import traceback
 
 from StarSonataAPI import *
 from StarSonataAPI.message_types import *
@@ -22,10 +23,12 @@ if rollbar_access_token:
   rollbar.init(
     rollbar_access_token,
     os.environ.get('ROLLBAR_ENVIRONMENT', 'production'),
-    handler='async',
+    handler='thread',
   )
 
-client = discord.Client()
+intents = discord.Intents.default()
+intents.message_content = True
+client = discord.Client(intents=intents)
 ss = StarSonataAPI()
 have_squad = False
 
@@ -34,8 +37,10 @@ def report_task_exception(task):
   if task.cancelled():
     return
   exception = task.exception()
-  if exception is not None and rollbar_access_token:
-    rollbar.report_exc_info((type(exception), exception, exception.__traceback__))
+  if exception is not None:
+    traceback.print_exception(type(exception), exception, exception.__traceback__)
+    if rollbar_access_token:
+      rollbar.report_exc_info((type(exception), exception, exception.__traceback__))
 
 
 # read the mapping
@@ -70,7 +75,7 @@ def recv_mapping(channel):
     if TextMessage.channel_to_recv(mapping['STARSONATA_CHANNEL']) != channel:
       continue
     if 'r' in mapping['MODE']:
-      channels.append(client.get_channel(id=mapping['DISCORD_CHANNEL']))
+      channels.append(client.get_channel(mapping['DISCORD_CHANNEL']))
   return channels
 
 
@@ -148,7 +153,7 @@ async def text_message(message):
         message += ' - ' + ', '.join([f'<@&{id}>' for id in alert['mentions']])
 
       for channel in alert['channels']:
-        await client.get_channel(id=channel).send(message)
+        await client.get_channel(channel).send(message)
 
   if ss.team:
     if tm.message == '!squad':
