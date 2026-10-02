@@ -1,4 +1,4 @@
-FROM debian:buster-slim
+FROM debian:trixie-slim
 
 RUN apt update && apt -y upgrade
 
@@ -8,7 +8,7 @@ RUN mkdir /build
 WORKDIR /build
 COPY requirements.txt .
 
-RUN pip3 install -r requirements.txt
+RUN pip3 install --break-system-packages -r requirements.txt
 
 RUN rm -rf /build
 

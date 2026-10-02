@@ -40,7 +40,13 @@ DISCORD_TOKEN=YourDiscordBotToken
 RELAY_USERNAME=ssUsername
 RELAY_PASSWORD=ssPassword
 RELAY_CHARACTER=0
+
+# optional error reporting
+ROLLBAR_ACCESS_TOKEN=YourRollbarServerToken
+ROLLBAR_ENVIRONMENT=production
 ```
+
+`ROLLBAR_ACCESS_TOKEN` enables Rollbar error reporting when set. Use a project access token with the `post_server_item` scope. `ROLLBAR_ENVIRONMENT` defaults to `production`.
 
 ### mapping.json
 `mapping.json` defines what messages get relayed from what channels to what channels.

@@ -6,6 +6,7 @@ import pytz
 import os
 import random
 import re
+import rollbar
 import xml.etree.ElementTree as ElementTree
 import math
 import sys
@@ -16,9 +17,25 @@ from StarSonataAPI.message_types import *
 
 import struct
 
+rollbar_access_token = os.environ.get('ROLLBAR_ACCESS_TOKEN')
+if rollbar_access_token:
+  rollbar.init(
+    rollbar_access_token,
+    os.environ.get('ROLLBAR_ENVIRONMENT', 'production'),
+    handler='async',
+  )
+
 client = discord.Client()
 ss = StarSonataAPI()
 have_squad = False
+
+
+def report_task_exception(task):
+  if task.cancelled():
+    return
+  exception = task.exception()
+  if exception is not None and rollbar_access_token:
+    rollbar.report_exc_info((type(exception), exception, exception.__traceback__))
 
 
 # read the mapping
@@ -212,7 +229,14 @@ async def on_ready():
   username = os.environ.get('RELAY_USERNAME')
   password = os.environ.get('RELAY_PASSWORD')
 
-  client.loop.create_task(ss.run(Account(username, password)))
+  task = client.loop.create_task(ss.run(Account(username, password)))
+  task.add_done_callback(report_task_exception)
+
+
+@client.event
+async def on_error(event, *args, **kwargs):
+  if rollbar_access_token:
+    rollbar.report_exc_info(extra_data={'discord_event': event})
 
 
 @client.event
@@ -260,4 +284,9 @@ if os.environ.get('RELAY_CHARACTER') is None:
 
 print(f'Relayer running on discord.py version {discord.__version__}')
 print('Starting bot')
-client.run(os.environ.get('DISCORD_TOKEN'))
+try:
+  client.run(os.environ.get('DISCORD_TOKEN'))
+except Exception:
+  if rollbar_access_token:
+    rollbar.report_exc_info()
+  raise
